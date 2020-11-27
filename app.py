@@ -3,11 +3,10 @@ import pandas as pd
 import sqlite3
 app = Flask(__name__) 
 
-
 #home root
 @app.route('/')
 def homepage():
-    return 'Hello World 2020'
+    return '<h1>#Hello World this is my project to build a simple API#</h1>'
 
 # mendapatkan buku
 @app.route('/ambil_buku')
@@ -34,28 +33,84 @@ def toprating(rating):
     books = data[condition]
     return books.to_json()
 
+# revenuebyday
+@app.route('/revenuebyday')
+def revenue():
+    conn = sqlite3.connect('data/chinook.db')
+    revenue = pd.read_sql_query(
+        '''
+        SELECT InvoiceDate, Total
+        FROM invoices
+        ''',
+            conn,
+            parse_dates='InvoiceDate'
+        )
+    revenue['DayName'] = revenue['InvoiceDate'].dt.day_name()
+    rbd = revenue.groupby('DayName').agg({'Total':'sum'}).sort_values(by='Total', ascending=False).loc['Wednesday'][0]
+    return (f'''<h1>Wednesday is the day with highest revenue: {rbd}</h1>
+                ''')
+
 # bestgenremusicbytotalsell
 @app.route('/bestgenres')
 def genres():
     conn = sqlite3.connect('data/chinook.db')
     genres = pd.read_sql_query(
         '''
-        SELECT genres.*, SUM(invoices.Total) as Total
-        FROM genres
-        LEFT JOIN tracks
-        ON tracks.GenreId = genres.GenreId
+        SELECT genres.Name, SUM(invoices.Total) as Total
+        FROM invoices
         LEFT JOIN invoice_items
-        ON invoice_items.TrackId = tracks.TrackId
-        LEFT JOIN invoices
-        ON invoices.InvoiceId = invoice_items.InvoiceId
+        ON invoice_items.InvoiceId = invoices.InvoiceId
+        LEFT JOIN tracks
+        ON tracks.TrackId = invoice_items.TrackId
+        LEFT JOIN genres
+        ON genres.GenreId = tracks.GenreId
         GROUP BY genres.Name
         ORDER BY Total DESC
         LIMIT 5
         ''',
             conn,
-            index_col='GenreId'
+            index_col='Name'
         )
-    return (genres.to_json()) 
+    return (genres.to_json())
+
+# artistpergenres
+@app.route('/artists')
+def artist():
+    conn = sqlite3.connect('data/chinook.db')
+    data = pd.read_sql_query(
+        '''
+        SELECT genres.Name, SUM(invoices.Total) as Total, artists.Name AS ArtistName
+        FROM invoices
+        LEFT JOIN invoice_items
+        ON invoice_items.InvoiceId = invoices.InvoiceId
+        LEFT JOIN tracks
+        ON tracks.TrackId = invoice_items.TrackId
+        LEFT JOIN genres
+        ON genres.GenreId = tracks.GenreId
+        LEFT JOIN albums
+        ON albums.AlbumId = tracks.AlbumId
+        LEFT JOIN artists
+        ON artists.ArtistId = albums.ArtistId
+        WHERE genres.Name IN (
+            SELECT genres.Name
+            FROM invoices
+            LEFT JOIN invoice_items
+            ON invoice_items.InvoiceId = invoices.InvoiceId
+            LEFT JOIN tracks
+            ON tracks.TrackId = invoice_items.TrackId
+            LEFT JOIN genres
+            ON genres.GenreId = tracks.GenreId
+            GROUP BY genres.Name
+            ORDER BY SUM(invoices.Total) DESC
+            LIMIT 5
+        )
+        GROUP BY genres.Name, artists.Name
+        ORDER BY Total DESC
+        ''',
+            conn
+        )
+    artists = data.drop_duplicates(subset='Name').set_index('Name')
+    return (artists.to_json())
 
 # mendapatkan keseluruhan data dari <data_name>
 @app.route('/data/get/<data_name>', methods=['GET']) 
