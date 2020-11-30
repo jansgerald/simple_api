@@ -142,7 +142,16 @@ def artist():
     artists = data.drop_duplicates(subset='Name').set_index('Name')
     return (artists.to_json())
 
- 
+# docs
+@app.route('/docs')
+def docs():
+    return (f'''
+    <br>
+    <center><h1>Capstone Project</h1></center>
+    <h3>This is Algoritma's Python for Data Analysis Capstone Project. This project aims to create a simple API to fetch data from Heroku Server.</h3>
+    <h3>As a Data Scientist, we demand data to be accessible. And as a data owner, we are careful with our data. As the answer, data owner create an API for anyone who are granted access to the data to collect them. In this capstone project, we will create Flask Application as an API and deploy it to Heroku Web Hosting.</h3>
+    
+    ''')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000) 
